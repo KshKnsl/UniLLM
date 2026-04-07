@@ -1,5 +1,3 @@
-package demo;
-
 import unillm.ChatResponse;
 import unillm.UniLLM;
 

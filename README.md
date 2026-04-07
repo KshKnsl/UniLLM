@@ -13,18 +13,30 @@ Minimal Java package for calling multiple model providers with one interface.
 
 - Java 11+
 
-## Build Jar (Single Command)
+## Build JAR
+
+Linux/macOS:
 
 ```bash
 mkdir -p out dist && javac -encoding UTF-8 -d out $(find src -name "*.java") && jar --create --file dist/unillm.jar -C out .
 ```
 
-Demo source is in `demo/Demo.java`.
+Windows (PowerShell):
 
-Compile and run demo with:
+```powershell
+New-Item -ItemType Directory -Path out, dist -Force | Out-Null; $sources = Get-ChildItem -Path src -Filter "*.java" -Recurse | ForEach-Object { $_.FullName }; javac -encoding UTF-8 -d out $sources; & "C:\Program Files\Java\jdk-24\bin\jar.exe" --create --file dist/unillm.jar -C out .
+```
 
-```bash
-javac -cp dist/unillm.jar -d demo/out demo/Demo.java && java -cp dist/unillm.jar:demo/out demo.Demo
+This creates `dist/unillm.jar` with all compiled classes.
+
+## Run Demo
+
+Demo source is in `Demo.java`.
+
+Windows (PowerShell):
+
+```powershell
+$sources = Get-ChildItem -Path src -Filter "*.java" -Recurse | ForEach-Object { $_.FullName }; javac -encoding UTF-8 -d out $sources; javac -cp out -d out Demo.java; java -cp out Demo
 ```
 
 ## Quick Library Usage
