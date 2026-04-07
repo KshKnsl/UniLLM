@@ -1,124 +1,48 @@
-# UniLLM Gateway 🚀
+# UniLLM
 
-A **unified AI Gateway** built in Java with Spring Boot. One API to rule them all — route requests to **OpenAI**, **Google Gemini**, and more, through a single standardized interface.
+Minimal Java package for calling multiple model providers with one interface.
 
-## ✨ Features
+## Supported Providers
 
-- 🔀 **Unified API** — One endpoint, multiple AI providers
-- 🌊 **Streaming (SSE)** — Real-time token-by-token responses via Server-Sent Events
-- 🏗️ **Strategy Pattern** — Clean OOP design; add new providers by implementing one interface
-- 🛡️ **Error Handling** — Global exception handler with clean JSON error responses
-- ⚡ **Reactive** — Built on Spring WebFlux for non-blocking, high-performance I/O
+- OpenAI: models starting with `gpt`
+- Claude: models starting with `claude`
+- Gemini: models starting with `gemini`
+- Ollama: models in form `ollama/<model>`
 
-## 📂 Project Structure
+## Requirements
 
-```
-src/main/java/com/unillm/
-├── UniLlmApplication.java          # Spring Boot entry point
-├── model/
-│   ├── AiRequest.java              # Unified request format
-│   ├── AiMessage.java              # Chat message (role + content)
-│   ├── AiResponse.java             # Unified response format
-│   └── AiStreamChunk.java          # Single streamed token chunk
-├── client/
-│   ├── AiClient.java               # Provider interface (Strategy)
-│   ├── OpenAiClient.java           # OpenAI implementation
-│   └── GeminiClient.java           # Google Gemini implementation
-├── service/
-│   └── AiGatewayService.java       # Route requests → correct provider
-├── controller/
-│   ├── AiController.java           # REST endpoints
-│   └── GlobalExceptionHandler.java # Error handling
-└── config/
-    ├── ProviderProperties.java      # YAML config binding
-    └── WebClientConfig.java         # HTTP client setup
-```
+- Java 11+
 
-## 🚀 Getting Started
-
-### Prerequisites
-- Java 17+
-- Maven 3.8+
-- API keys for at least one provider (OpenAI or Gemini)
-
-### 1. Set API Keys
-
-Set environment variables:
-```bash
-export OPENAI_API_KEY=sk-your-key-here
-export GEMINI_API_KEY=your-gemini-key-here
-```
-
-Or edit `src/main/resources/application.yml` directly.
-
-### 2. Build & Run
+## Build Jar (Single Command)
 
 ```bash
-mvn clean install
-mvn spring-boot:run
+mkdir -p out dist && javac -encoding UTF-8 -d out $(find src -name "*.java") && jar --create --file dist/unillm.jar -C out .
 ```
 
-The server starts on **http://localhost:8080**.
+Demo source is in `demo/Demo.java`.
 
-## 📡 API Endpoints
+Compile and run demo with:
 
-### Health Check
 ```bash
-GET /api/health
+javac -cp dist/unillm.jar -d demo/out demo/Demo.java && java -cp dist/unillm.jar:demo/out demo.Demo
 ```
 
-### List Providers
-```bash
-GET /api/providers
+## Quick Library Usage
+
+```java
+import unillm.ChatResponse;
+import unillm.UniLLM;
+
+UniLLM llm = UniLLM.defaultClients(
+    System.getenv("OPENAI_API_KEY"),
+    System.getenv("ANTHROPIC_API_KEY"),
+    System.getenv("GEMINI_API_KEY")
+);
+
+ChatResponse a = llm.chat("gpt-4o-mini", "Say hi");
+ChatResponse b = llm.chat("claude-3-5-sonnet-latest", "List 3 git tips");
+ChatResponse c = llm.chat("gemini-2.0-flash", "Write one-line summary of Java streams");
+ChatResponse d = llm.chat("ollama/llama3.1", "Explain polymorphism in one paragraph");
+
+System.out.println(a.text());
 ```
-
-### Chat Completion (Non-Streaming)
-```bash
-POST /api/chat/completions
-Content-Type: application/json
-
-{
-  "model": "gpt-3.5-turbo",
-  "messages": [
-    {"role": "user", "content": "Explain Java records in 3 sentences."}
-  ],
-  "temperature": 0.7
-}
-```
-
-### Chat Completion (Streaming / SSE)
-```bash
-POST /api/chat/stream
-Content-Type: application/json
-
-{
-  "model": "gemini-2.0-flash",
-  "messages": [
-    {"role": "user", "content": "Write a short poem about coding."}
-  ]
-}
-```
-
-## 🔌 Supported Models
-
-| Provider | Model Prefix | Examples |
-|----------|-------------|----------|
-| OpenAI   | `gpt`       | `gpt-3.5-turbo`, `gpt-4`, `gpt-4o` |
-| Gemini   | `gemini`    | `gemini-pro`, `gemini-2.0-flash`, `gemini-1.5-pro` |
-
-## 🏗️ Adding a New Provider
-
-1. Create a class implementing `AiClient` in `com.unillm.client`
-2. Annotate with `@Component`
-3. Implement `getProvider()`, `supports()`, `generate()`, and `generateStream()`
-4. Add config in `application.yml` and `ProviderProperties.java`
-
-Spring auto-discovers it — **zero changes needed** in the gateway service or controller!
-
-## 🎓 Design Patterns Used
-
-- **Strategy Pattern** — `AiClient` interface with swappable provider implementations
-- **Factory Pattern** — `AiGatewayService` resolves the right client at runtime
-- **Dependency Injection** — Spring auto-wires all `AiClient` beans
-- **Record Classes** — Java records for immutable DTOs
-- **Reactive Streams** — Project Reactor (`Mono`/`Flux`) for async, non-blocking I/O
