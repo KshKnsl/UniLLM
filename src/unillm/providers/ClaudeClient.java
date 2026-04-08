@@ -1,14 +1,15 @@
 package unillm.providers;
 
+import java.io.IOException;
+import java.net.http.HttpClient;
+import java.util.List;
+import java.util.Map;
+
 import unillm.ChatMessage;
 import unillm.ChatRequest;
 import unillm.ChatResponse;
 import unillm.ProviderClient;
 import unillm.core.HttpJson;
-
-import java.io.IOException;
-import java.net.http.HttpClient;
-import java.util.Map;
 
 public class ClaudeClient implements ProviderClient {
     private final String apiKey;
@@ -58,5 +59,12 @@ public class ClaudeClient implements ProviderClient {
 
         String text = HttpJson.firstGroup(res, "\\\"text\\\"\\s*:\\s*\\\"((?:\\\\\\\"|\\\\\\\\|[^\\\"])+)\\\"");
         return new ChatResponse(name(), request.model(), text);
+    }
+
+    @Override
+    public List<String> listModels() throws IOException, InterruptedException {
+        String res = HttpJson.get(http, "https://api.anthropic.com/v1/models",
+                Map.of("x-api-key", apiKey, "anthropic-version", "2023-06-01"));
+        return HttpJson.allGroups(res, "\\\"id\\\"\\s*:\\s*\\\"((?:\\\\\\\"|\\\\\\\\|[^\\\"])+)\\\"");
     }
 }

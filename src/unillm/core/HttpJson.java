@@ -5,6 +5,8 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -18,6 +20,20 @@ public final class HttpJson {
         HttpRequest.Builder builder = HttpRequest.newBuilder(URI.create(url))
                 .header("Content-Type", "application/json")
                 .POST(HttpRequest.BodyPublishers.ofString(body));
+
+        headers.forEach(builder::header);
+        HttpResponse<String> response = client.send(builder.build(), HttpResponse.BodyHandlers.ofString());
+
+        if (response.statusCode() < 200 || response.statusCode() >= 300) {
+            throw new IOException("HTTP " + response.statusCode() + " from " + url + ": " + response.body());
+        }
+        return response.body();
+    }
+
+    public static String get(HttpClient client, String url, Map<String, String> headers)
+            throws IOException, InterruptedException {
+        HttpRequest.Builder builder = HttpRequest.newBuilder(URI.create(url))
+                .GET();
 
         headers.forEach(builder::header);
         HttpResponse<String> response = client.send(builder.build(), HttpResponse.BodyHandlers.ofString());
@@ -60,6 +76,16 @@ public final class HttpJson {
         Pattern p = Pattern.compile(regex, Pattern.DOTALL);
         Matcher m = p.matcher(text);
         return m.find() ? unescapeJson(m.group(1)) : "";
+    }
+
+    public static List<String> allGroups(String text, String regex) {
+        Pattern p = Pattern.compile(regex, Pattern.DOTALL);
+        Matcher m = p.matcher(text);
+        List<String> out = new ArrayList<>();
+        while (m.find()) {
+            out.add(unescapeJson(m.group(1)));
+        }
+        return out;
     }
 
     private static String unescapeJson(String value) {

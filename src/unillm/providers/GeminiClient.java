@@ -8,6 +8,7 @@ import unillm.core.HttpJson;
 
 import java.io.IOException;
 import java.net.http.HttpClient;
+import java.util.List;
 import java.util.Map;
 
 public class GeminiClient implements ProviderClient {
@@ -69,5 +70,15 @@ public class GeminiClient implements ProviderClient {
         String res = HttpJson.post(http, url, Map.of(), body.toString());
         String text = HttpJson.firstGroup(res, "\\\"text\\\"\\s*:\\s*\\\"((?:\\\\\\\"|\\\\\\\\|[^\\\"])+)\\\"");
         return new ChatResponse(name(), request.model(), text);
+    }
+
+    @Override
+    public List<String> listModels() throws IOException, InterruptedException {
+        String url = "https://generativelanguage.googleapis.com/v1beta/models?key=" + apiKey;
+        String res = HttpJson.get(http, url, Map.of());
+        List<String> names = HttpJson.allGroups(res,
+                "\\\"name\\\"\\s*:\\s*\\\"((?:\\\\\\\"|\\\\\\\\|[^\\\"])+)\\\"");
+        names.removeIf(name -> !name.startsWith("models/"));
+        return names;
     }
 }

@@ -8,6 +8,7 @@ import unillm.core.HttpJson;
 
 import java.io.IOException;
 import java.net.http.HttpClient;
+import java.util.List;
 import java.util.Map;
 
 public class OllamaClient implements ProviderClient {
@@ -67,5 +68,11 @@ public class OllamaClient implements ProviderClient {
         String text = HttpJson.firstGroup(res,
                 "\\\"message\\\"\\s*:\\s*\\{.*?\\\"content\\\"\\s*:\\s*\\\"((?:\\\\\\\"|\\\\\\\\|[^\\\"])+)\\\"");
         return new ChatResponse(name(), request.model(), text);
+    }
+
+    @Override
+    public List<String> listModels() throws IOException, InterruptedException {
+        String res = HttpJson.get(http, baseUrl + "/api/tags", Map.of());
+        return HttpJson.allGroups(res, "\\\"name\\\"\\s*:\\s*\\\"((?:\\\\\\\"|\\\\\\\\|[^\\\"])+)\\\"");
     }
 }
