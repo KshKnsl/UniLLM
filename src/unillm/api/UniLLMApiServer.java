@@ -431,8 +431,9 @@ public final class UniLLMApiServer {
 
     private void sendBytes(HttpExchange exchange, int statusCode, byte[] bytes, String contentType) throws IOException {
         exchange.getResponseHeaders().set("Content-Type", contentType);
-        exchange.sendResponseHeaders(statusCode, bytes.length);
-        if (!"HEAD".equalsIgnoreCase(exchange.getRequestMethod())) {
+        boolean headRequest = "HEAD".equalsIgnoreCase(exchange.getRequestMethod());
+        exchange.sendResponseHeaders(statusCode, headRequest ? -1 : bytes.length);
+        if (!headRequest) {
             exchange.getResponseBody().write(bytes);
             exchange.getResponseBody().flush();
         }
@@ -441,8 +442,9 @@ public final class UniLLMApiServer {
     private void sendPlainText(HttpExchange exchange, int statusCode, String message) throws IOException {
         byte[] bytes = message.getBytes(StandardCharsets.UTF_8);
         exchange.getResponseHeaders().set("Content-Type", "text/plain; charset=utf-8");
-        exchange.sendResponseHeaders(statusCode, bytes.length);
-        if (!"HEAD".equalsIgnoreCase(exchange.getRequestMethod())) {
+        boolean headRequest = "HEAD".equalsIgnoreCase(exchange.getRequestMethod());
+        exchange.sendResponseHeaders(statusCode, headRequest ? -1 : bytes.length);
+        if (!headRequest) {
             exchange.getResponseBody().write(bytes);
             exchange.getResponseBody().flush();
         }
@@ -450,9 +452,12 @@ public final class UniLLMApiServer {
 
     private void sendJson(HttpExchange exchange, int statusCode, JsonNode body) throws IOException {
         byte[] bytes = HttpJson.MAPPER.writeValueAsBytes(body);
-        exchange.sendResponseHeaders(statusCode, bytes.length);
-        exchange.getResponseBody().write(bytes);
-        exchange.getResponseBody().flush();
+        boolean headRequest = "HEAD".equalsIgnoreCase(exchange.getRequestMethod());
+        exchange.sendResponseHeaders(statusCode, headRequest ? -1 : bytes.length);
+        if (!headRequest) {
+            exchange.getResponseBody().write(bytes);
+            exchange.getResponseBody().flush();
+        }
     }
 
     private ObjectNode error(String code, String message) {

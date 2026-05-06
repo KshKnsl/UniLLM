@@ -19,9 +19,18 @@ import { Separator } from './components/ui/separator';
 import { Textarea } from './components/ui/textarea';
 
 const SETTINGS_STORAGE_KEY = 'unillm.frontend.settings.v1';
+const LOCAL_API_BASE_URL = 'http://localhost:8080';
+
+function defaultApiBaseUrl() {
+  if (typeof window !== 'undefined' && window.location.hostname === 'localhost') {
+    return LOCAL_API_BASE_URL;
+  }
+
+  return '';
+}
 
 const DEFAULT_SETTINGS = {
-  apiBaseUrl: 'http://localhost:8080',
+  apiBaseUrl: defaultApiBaseUrl(),
   openAiKey: '',
   anthropicKey: '',
   geminiKey: '',
@@ -35,15 +44,22 @@ function loadSettings() {
     return DEFAULT_SETTINGS;
   }
 
+  const defaults = { ...DEFAULT_SETTINGS, apiBaseUrl: defaultApiBaseUrl() };
+
   try {
     const raw = window.localStorage.getItem(SETTINGS_STORAGE_KEY);
     if (!raw) {
-      return DEFAULT_SETTINGS;
+      return defaults;
     }
 
-    return { ...DEFAULT_SETTINGS, ...JSON.parse(raw) };
+    const settings = { ...defaults, ...JSON.parse(raw) };
+    if (window.location.hostname !== 'localhost' && settings.apiBaseUrl === LOCAL_API_BASE_URL) {
+      settings.apiBaseUrl = defaults.apiBaseUrl;
+    }
+
+    return settings;
   } catch {
-    return DEFAULT_SETTINGS;
+    return defaults;
   }
 }
 
@@ -233,7 +249,7 @@ function App() {
             <div className="flex flex-wrap items-center gap-3">
               <Badge className="gap-2 bg-emerald-500/15 text-emerald-300 hover:bg-emerald-500/15">
                 <Sparkles className="h-3.5 w-3.5" />
-                Localhost-first settings
+                Deployment-ready settings
               </Badge>
               <Badge variant="outline" className="border-border/60 text-slate-200">
                 Frontend owns keys, backend reads headers
@@ -244,7 +260,7 @@ function App() {
                 One console for the whole UniLLM library.
               </CardTitle>
               <CardDescription className="max-w-4xl text-base leading-7 text-slate-300 md:text-lg">
-                Configure your local API URL and provider keys here, then browse providers, inspect model lists, and
+                Configure your API URL and provider keys here, then browse providers, inspect model lists, and
                 send prompts from the same browser session.
               </CardDescription>
             </div>
@@ -272,7 +288,7 @@ function App() {
               Local settings
             </CardTitle>
             <CardDescription>
-              These values are stored in your browser and sent to the localhost API on each request.
+              These values are stored in your browser and sent to the configured API on each request.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -282,8 +298,8 @@ function App() {
                   label="Backend URL"
                   value={settingsDraft.apiBaseUrl}
                   onChange={(value) => setSettingsDraft((current) => ({ ...current, apiBaseUrl: value }))}
-                  placeholder="http://localhost:8080"
-                  helpText="This should point to the local Java API server."
+                  placeholder="Leave blank to use this deployment"
+                  helpText="Leave blank when the frontend and Java API are served from the same deployment."
                 />
                 <SettingsField
                   label="Ollama base URL"
