@@ -5,11 +5,7 @@ RUN npm install -g pnpm@latest
 COPY frontend/package*.json ./
 COPY frontend/pnpm-lock.yaml ./
 RUN pnpm install --frozen-lockfile
-COPY frontend/src/lib ./src/lib
-COPY frontend/src/components ./src/components
-COPY frontend/src/*.jsx ./src/
-COPY frontend/src/*.js ./src/
-COPY frontend/src/*.css ./src/
+COPY frontend/src ./src
 COPY frontend/*.config.js ./
 COPY frontend/index.html ./
 COPY frontend/components.json ./
