@@ -1,7 +1,12 @@
 package unillm.providers;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+
 import java.io.IOException;
 import java.net.http.HttpClient;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -31,40 +36,52 @@ public class ClaudeClient implements ProviderClient {
 
     @Override
     public ChatResponse chat(ChatRequest request) throws IOException, InterruptedException {
-        StringBuilder body = new StringBuilder();
-        body.append("{\"model\":").append(HttpJson.quote(request.model()));
-        body.append(",\"messages\":[");
-        boolean first = true;
+        ObjectNode body = HttpJson.MAPPER.createObjectNode();
+        body.put("model", request.model());
+        ArrayNode messages = body.putArray("messages");
+
         for (ChatMessage m : request.messages()) {
             if ("system".equalsIgnoreCase(m.role()))
                 continue;
-            if (!first)
-                body.append(',');
+
             String role = "assistant".equalsIgnoreCase(m.role()) ? "assistant" : "user";
-            body.append("{\"role\":").append(HttpJson.quote(role)).append(",\"content\":")
-                    .append(HttpJson.quote(m.content())).append("}");
-            first = false;
+            ObjectNode msg = messages.addObject();
+            msg.put("role", role);
+            msg.put("content", m.content());
         }
-        body.append(']');
-        body.append(",\"max_tokens\":").append(request.maxTokens() == null ? 1024 : request.maxTokens());
+
+        Integer requestedMaxTokens = request.maxTokens();
+        body.put("max_tokens", requestedMaxTokens != null ? requestedMaxTokens.intValue() : 1024);
         if (request.temperature() != null)
-            body.append(",\"temperature\":").append(request.temperature());
+            body.put("temperature", request.temperature());
         if (request.system() != null && !request.system().trim().isEmpty()) {
-            body.append(",\"system\":").append(HttpJson.quote(request.system()));
+            body.put("system", request.system());
         }
-        body.append('}');
 
-        String res = HttpJson.post(http, "https://api.anthropic.com/v1/messages",
-                Map.of("x-api-key", apiKey, "anthropic-version", "2023-06-01"), body.toString());
+        JsonNode res = HttpJson.postJson(http, "https://api.anthropic.com/v1/messages",
+                Map.of("x-api-key", apiKey, "anthropic-version", "2023-06-01"), body);
 
-        String text = HttpJson.firstGroup(res, "\\\"text\\\"\\s*:\\s*\\\"((?:\\\\\\\"|\\\\\\\\|[^\\\"])+)\\\"");
+        String text = "";
+        for (JsonNode block : res.path("content")) {
+            if ("text".equals(block.path("type").asText(""))) {
+                text = block.path("text").asText("");
+                break;
+            }
+        }
         return new ChatResponse(name(), request.model(), text);
     }
 
     @Override
     public List<String> listModels() throws IOException, InterruptedException {
-        String res = HttpJson.get(http, "https://api.anthropic.com/v1/models",
+        JsonNode res = HttpJson.getJson(http, "https://api.anthropic.com/v1/models",
                 Map.of("x-api-key", apiKey, "anthropic-version", "2023-06-01"));
-        return HttpJson.allGroups(res, "\\\"id\\\"\\s*:\\s*\\\"((?:\\\\\\\"|\\\\\\\\|[^\\\"])+)\\\"");
+        List<String> models = new ArrayList<>();
+        for (JsonNode item : res.path("data")) {
+            String id = item.path("id").asText("");
+            if (!id.isEmpty()) {
+                models.add(id);
+            }
+        }
+        return models;
     }
 }

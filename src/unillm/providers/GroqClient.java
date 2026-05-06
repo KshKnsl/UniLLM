@@ -1,7 +1,12 @@
 package unillm.providers;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+
 import java.io.IOException;
 import java.net.http.HttpClient;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -33,42 +38,43 @@ public class GroqClient implements ProviderClient {
     public ChatResponse chat(ChatRequest request) throws IOException, InterruptedException {
         String model = request.model().substring("groq/".length());
 
-        StringBuilder body = new StringBuilder();
-        body.append("{\"model\":").append(HttpJson.quote(model)).append(",\"messages\":[");
-        boolean first = true;
+        ObjectNode body = HttpJson.MAPPER.createObjectNode();
+        body.put("model", model);
+        ArrayNode messages = body.putArray("messages");
+
         if (request.system() != null && !request.system().trim().isEmpty()) {
-            body.append("{\"role\":\"system\",\"content\":").append(HttpJson.quote(request.system())).append("}");
-            first = false;
+            ObjectNode systemMessage = messages.addObject();
+            systemMessage.put("role", "system");
+            systemMessage.put("content", request.system());
         }
         for (ChatMessage m : request.messages()) {
-            if (!first)
-                body.append(',');
-            body.append("{\"role\":").append(HttpJson.quote(m.role())).append(",\"content\":")
-                    .append(HttpJson.quote(m.content())).append("}");
-            first = false;
+            ObjectNode message = messages.addObject();
+            message.put("role", m.role());
+            message.put("content", m.content());
         }
-        body.append(']');
+
         if (request.temperature() != null)
-            body.append(",\"temperature\":").append(request.temperature());
+            body.put("temperature", request.temperature());
         if (request.maxTokens() != null)
-            body.append(",\"max_tokens\":").append(request.maxTokens());
-        body.append('}');
+            body.put("max_tokens", request.maxTokens());
 
-        String res = HttpJson.post(http, "https://api.groq.com/openai/v1/chat/completions",
-                Map.of("Authorization", "Bearer " + apiKey), body.toString());
+        JsonNode res = HttpJson.postJson(http, "https://api.groq.com/openai/v1/chat/completions",
+                Map.of("Authorization", "Bearer " + apiKey), body);
 
-        String text = HttpJson.firstGroup(res,
-                "\\\"message\\\"\\s*:\\s*\\{.*?\\\"content\\\"\\s*:\\s*\\\"((?:\\\\\\\"|\\\\\\\\|[^\\\"])+)\\\"");
+        String text = res.path("choices").path(0).path("message").path("content").asText("");
         return new ChatResponse(name(), request.model(), text);
     }
 
     @Override
     public List<String> listModels() throws IOException, InterruptedException {
-        String res = HttpJson.get(http, "https://api.groq.com/openai/v1/models",
+        JsonNode res = HttpJson.getJson(http, "https://api.groq.com/openai/v1/models",
                 Map.of("Authorization", "Bearer " + apiKey));
-        List<String> ids = HttpJson.allGroups(res, "\\\"id\\\"\\s*:\\s*\\\"((?:\\\\\\\"|\\\\\\\\|[^\\\"])+)\\\"");
-        for (int i = 0; i < ids.size(); i++) {
-            ids.set(i, "groq/" + ids.get(i));
+        List<String> ids = new ArrayList<>();
+        for (JsonNode item : res.path("data")) {
+            String id = item.path("id").asText("");
+            if (!id.isEmpty()) {
+                ids.add("groq/" + id);
+            }
         }
         return ids;
     }

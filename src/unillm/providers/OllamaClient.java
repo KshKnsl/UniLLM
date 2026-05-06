@@ -1,5 +1,8 @@
 package unillm.providers;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import unillm.ChatMessage;
 import unillm.ChatRequest;
 import unillm.ChatResponse;
@@ -33,46 +36,47 @@ public class OllamaClient implements ProviderClient {
     public ChatResponse chat(ChatRequest request) throws IOException, InterruptedException {
         String model = request.model().substring("ollama/".length());
 
-        StringBuilder body = new StringBuilder();
-        body.append("{\"model\":").append(HttpJson.quote(model)).append(",\"messages\":[");
-        boolean first = true;
+        ObjectNode body = HttpJson.MAPPER.createObjectNode();
+        body.put("model", model);
+        ArrayNode messages = body.putArray("messages");
+
         if (request.system() != null && !request.system().trim().isEmpty()) {
-            body.append("{\"role\":\"system\",\"content\":").append(HttpJson.quote(request.system())).append("}");
-            first = false;
+            ObjectNode systemMessage = messages.addObject();
+            systemMessage.put("role", "system");
+            systemMessage.put("content", request.system());
         }
         for (ChatMessage m : request.messages()) {
-            if (!first)
-                body.append(',');
-            body.append("{\"role\":").append(HttpJson.quote(m.role()))
-                    .append(",\"content\":").append(HttpJson.quote(m.content())).append("}");
-            first = false;
+            ObjectNode message = messages.addObject();
+            message.put("role", m.role());
+            message.put("content", m.content());
         }
-        body.append("],\"stream\":false");
+
+        body.put("stream", false);
         if (request.temperature() != null || request.maxTokens() != null) {
-            body.append(",\"options\":{");
-            boolean optFirst = true;
+            ObjectNode options = body.putObject("options");
             if (request.temperature() != null) {
-                body.append("\"temperature\":").append(request.temperature());
-                optFirst = false;
+                options.put("temperature", request.temperature());
             }
             if (request.maxTokens() != null) {
-                if (!optFirst)
-                    body.append(',');
-                body.append("\"num_predict\":").append(request.maxTokens());
+                options.put("num_predict", request.maxTokens());
             }
-            body.append('}');
         }
-        body.append('}');
 
-        String res = HttpJson.post(http, baseUrl + "/api/chat", Map.of(), body.toString());
-        String text = HttpJson.firstGroup(res,
-                "\\\"message\\\"\\s*:\\s*\\{.*?\\\"content\\\"\\s*:\\s*\\\"((?:\\\\\\\"|\\\\\\\\|[^\\\"])+)\\\"");
+        JsonNode res = HttpJson.postJson(http, baseUrl + "/api/chat", Map.of(), body);
+        String text = res.path("message").path("content").asText("");
         return new ChatResponse(name(), request.model(), text);
     }
 
     @Override
     public List<String> listModels() throws IOException, InterruptedException {
-        String res = HttpJson.get(http, baseUrl + "/api/tags", Map.of());
-        return HttpJson.allGroups(res, "\\\"name\\\"\\s*:\\s*\\\"((?:\\\\\\\"|\\\\\\\\|[^\\\"])+)\\\"");
+        JsonNode res = HttpJson.getJson(http, baseUrl + "/api/tags", Map.of());
+        List<String> models = new java.util.ArrayList<>();
+        for (JsonNode item : res.path("models")) {
+            String name = item.path("name").asText("");
+            if (!name.isEmpty()) {
+                models.add(name);
+            }
+        }
+        return models;
     }
 }

@@ -1,6 +1,7 @@
 package unillm;
 
 import unillm.providers.ClaudeClient;
+import unillm.providers.DefaultProviderClientFactory;
 import unillm.providers.GeminiClient;
 import unillm.providers.GroqClient;
 import unillm.providers.OllamaClient;
@@ -23,13 +24,20 @@ public class UniLLM {
 
     public static UniLLM defaultClients(String openAiKey, String claudeKey, String geminiKey,
                                         String groqKey, boolean includeOllama) {
-        List<ProviderClient> clients = new ArrayList<>();
-        if (openAiKey != null && !openAiKey.isBlank()) clients.add(new OpenAiClient(openAiKey));
-        if (claudeKey != null && !claudeKey.isBlank()) clients.add(new ClaudeClient(claudeKey));
-        if (geminiKey != null && !geminiKey.isBlank()) clients.add(new GeminiClient(geminiKey));
-        if (groqKey != null && !groqKey.isBlank()) clients.add(new GroqClient(groqKey));
-        if (includeOllama) clients.add(new OllamaClient("http://localhost:11434"));
-        return new UniLLM(clients);
+        return fromFactory(new DefaultProviderClientFactory(
+                openAiKey,
+                claudeKey,
+                geminiKey,
+                groqKey,
+                includeOllama
+        ));
+    }
+
+    public static UniLLM fromFactory(ProviderClientFactory factory) {
+        if (factory == null) {
+            throw new IllegalArgumentException("Factory cannot be null");
+        }
+        return new UniLLM(factory.createClients());
     }
 
     public List<String> providers() {

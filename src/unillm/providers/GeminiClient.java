@@ -1,5 +1,8 @@
 package unillm.providers;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import unillm.ChatMessage;
 import unillm.ChatRequest;
 import unillm.ChatResponse;
@@ -26,59 +29,65 @@ public class GeminiClient implements ProviderClient {
 
     @Override
     public boolean supports(String model) {
-        return model != null && model.toLowerCase().startsWith("gemini");
+        if (model == null) {
+            return false;
+        }
+        String lower = model.toLowerCase();
+        return lower.startsWith("gemini") || lower.startsWith("models/gemini");
     }
 
     @Override
     public ChatResponse chat(ChatRequest request) throws IOException, InterruptedException {
-        StringBuilder body = new StringBuilder();
-        body.append("{\"contents\":[");
-        boolean first = true;
+        ObjectNode body = HttpJson.MAPPER.createObjectNode();
+        ArrayNode contents = body.putArray("contents");
+
         for (ChatMessage m : request.messages()) {
             if ("system".equalsIgnoreCase(m.role()))
                 continue;
-            if (!first)
-                body.append(',');
+
             String role = "assistant".equalsIgnoreCase(m.role()) ? "model" : "user";
-            body.append("{\"role\":").append(HttpJson.quote(role))
-                    .append(",\"parts\":[{\"text\":").append(HttpJson.quote(m.content())).append("}]}");
-            first = false;
+            ObjectNode content = contents.addObject();
+            content.put("role", role);
+            ArrayNode parts = content.putArray("parts");
+            parts.addObject().put("text", m.content());
         }
-        body.append(']');
+
         if (request.system() != null && !request.system().trim().isEmpty()) {
-            body.append(",\"systemInstruction\":{\"parts\":[{\"text\":")
-                    .append(HttpJson.quote(request.system())).append("}]}");
+            ObjectNode instruction = body.putObject("systemInstruction");
+            instruction.putArray("parts").addObject().put("text", request.system());
         }
         if (request.temperature() != null || request.maxTokens() != null) {
-            body.append(",\"generationConfig\":{");
-            boolean cfgFirst = true;
+            ObjectNode config = body.putObject("generationConfig");
             if (request.temperature() != null) {
-                body.append("\"temperature\":").append(request.temperature());
-                cfgFirst = false;
+                config.put("temperature", request.temperature());
             }
             if (request.maxTokens() != null) {
-                if (!cfgFirst)
-                    body.append(',');
-                body.append("\"maxOutputTokens\":").append(request.maxTokens());
+                config.put("maxOutputTokens", request.maxTokens());
             }
-            body.append('}');
         }
-        body.append('}');
 
-        String url = "https://generativelanguage.googleapis.com/v1beta/models/" + request.model()
+        String url = "https://generativelanguage.googleapis.com/v1beta/models/" + normalizeModel(request.model())
                 + ":generateContent?key=" + apiKey;
-        String res = HttpJson.post(http, url, Map.of(), body.toString());
-        String text = HttpJson.firstGroup(res, "\\\"text\\\"\\s*:\\s*\\\"((?:\\\\\\\"|\\\\\\\\|[^\\\"])+)\\\"");
+        JsonNode res = HttpJson.postJson(http, url, Map.of(), body);
+        String text = res.path("candidates").path(0).path("content").path("parts").path(0).path("text").asText("");
         return new ChatResponse(name(), request.model(), text);
     }
 
     @Override
     public List<String> listModels() throws IOException, InterruptedException {
         String url = "https://generativelanguage.googleapis.com/v1beta/models?key=" + apiKey;
-        String res = HttpJson.get(http, url, Map.of());
-        List<String> names = HttpJson.allGroups(res,
-                "\\\"name\\\"\\s*:\\s*\\\"((?:\\\\\\\"|\\\\\\\\|[^\\\"])+)\\\"");
-        names.removeIf(name -> !name.startsWith("models/"));
+        JsonNode res = HttpJson.getJson(http, url, Map.of());
+        List<String> names = new java.util.ArrayList<>();
+        for (JsonNode item : res.path("models")) {
+            String name = item.path("name").asText("");
+            if (name.startsWith("models/")) {
+                names.add(name.substring("models/".length()));
+            }
+        }
         return names;
+    }
+
+    private String normalizeModel(String model) {
+        return model.startsWith("models/") ? model.substring("models/".length()) : model;
     }
 }

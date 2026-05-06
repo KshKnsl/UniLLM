@@ -1,12 +1,14 @@
 # UniLLM
 
 Minimal Java package for calling multiple model providers with one interface.
+The library keeps orchestration in `UniLLM` and moves provider construction into a factory so the core stays open for extension.
 
 ## Supported Providers
 
 - OpenAI: models starting with `gpt`
 - Claude: models starting with `claude`
 - Gemini: models starting with `gemini`
+- Groq: models in form `groq/<model>`
 - Ollama: models in form `ollama/<model>`
 
 ## Requirements
@@ -15,21 +17,27 @@ Minimal Java package for calling multiple model providers with one interface.
 
 ## Build JAR
 
-javac -d out src/unillm/_.java src/unillm/core/_.java src/unillm/providers/\*.java
-javac -cp out Demo.java  
-java -cp "out;." Demo
+javac -cp "lib/*" -d out src/unillm/*.java src/unillm/core/*.java src/unillm/providers/*.java
+javac -cp "lib/*;out" Demo.java
+java -cp "lib/*;out;." Demo
 
 ## Quick Library Usage
 
 ```java
 import unillm.ChatResponse;
+import unillm.ProviderClientFactory;
 import unillm.UniLLM;
+import unillm.providers.DefaultProviderClientFactory;
 
-UniLLM llm = UniLLM.defaultClients(
+ProviderClientFactory factory = new DefaultProviderClientFactory(
     System.getenv("OPENAI_API_KEY"),
     System.getenv("ANTHROPIC_API_KEY"),
-    System.getenv("GEMINI_API_KEY")
+    System.getenv("GEMINI_API_KEY"),
+    System.getenv("GROQ_API_KEY"),
+    true
 );
+
+UniLLM llm = UniLLM.fromFactory(factory);
 
 ChatResponse a = llm.chat("gpt-4o-mini", "Say hi");
 ChatResponse b = llm.chat("claude-3-5-sonnet-latest", "List 3 git tips");

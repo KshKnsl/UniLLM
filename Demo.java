@@ -5,19 +5,22 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import unillm.ProviderClientFactory;
 import unillm.UniLLM;
+import unillm.providers.DefaultProviderClientFactory;
 
 public class Demo {
     public static void main(String[] args) throws Exception {
-        Map<String, String> keys = loadApiKeys("api_keys.txt");
+        Map<String, String> keys = loadApiKeys(".env");
         
-        UniLLM llm = UniLLM.defaultClients(
+        ProviderClientFactory factory = new DefaultProviderClientFactory(
                 keys.get("OPENAI_API_KEY"),
                 keys.get("ANTHROPIC_API_KEY"),
                 keys.get("GEMINI_API_KEY"),
                 keys.get("GROQ_API_KEY"),
                 false
         );
+        UniLLM llm = UniLLM.fromFactory(factory);
 
         Map<String, List<String>> allModels = llm.listAllModels();
         for (Map.Entry<String, List<String>> entry : allModels.entrySet()) {
