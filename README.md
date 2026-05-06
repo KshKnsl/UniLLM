@@ -4,6 +4,7 @@ Minimal Java package for calling multiple model providers with one interface.
 The library keeps orchestration in `UniLLM` and moves provider construction into a factory so the core stays open for extension.
 
 This repo now also includes a Java API server and a React frontend in `frontend/`.
+The frontend stores local API settings and provider keys in the browser and sends them to the localhost API on each request.
 
 ## Supported Providers
 
@@ -26,6 +27,8 @@ javac -cp "lib/*" -d out src/unillm/*.java src/unillm/core/*.java src/unillm/pro
 java -cp "lib/*;out;." unillm.api.UniLLMApiServer
 ```
 
+The API reads provider keys from request headers first, then falls back to environment variables. The frontend sends those headers automatically when you save the local settings.
+
 React frontend:
 
 ```bash
@@ -34,7 +37,7 @@ npm install
 npm run dev
 ```
 
-The Vite dev server proxies `/api` requests to `http://localhost:8080`.
+In the UI, set the backend URL to `http://localhost:8080`, add any provider keys you want to use, and save the settings before browsing providers or sending prompts.
 
 ## Quick Library Usage
 

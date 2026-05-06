@@ -1,19 +1,5 @@
 package unillm.api;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.node.ArrayNode;
-import com.fasterxml.jackson.databind.node.ObjectNode;
-import com.sun.net.httpserver.Headers;
-import com.sun.net.httpserver.HttpExchange;
-import com.sun.net.httpserver.HttpHandler;
-import com.sun.net.httpserver.HttpServer;
-import unillm.ChatMessage;
-import unillm.ChatRequest;
-import unillm.ChatResponse;
-import unillm.UniLLM;
-import unillm.core.HttpJson;
-import unillm.providers.DefaultProviderClientFactory;
-
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -26,14 +12,33 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.sun.net.httpserver.Headers;
+import com.sun.net.httpserver.HttpExchange;
+import com.sun.net.httpserver.HttpHandler;
+import com.sun.net.httpserver.HttpServer;
+
+import unillm.ChatMessage;
+import unillm.ChatRequest;
+import unillm.ChatResponse;
+import unillm.UniLLM;
+import unillm.core.HttpJson;
+import unillm.providers.DefaultProviderClientFactory;
+
 public final class UniLLMApiServer {
     private static final String DEFAULT_OLLAMA_URL = "http://localhost:11434";
+    private static final String HEADER_OPENAI_KEY = "x-unillm-openai-key";
+    private static final String HEADER_ANTHROPIC_KEY = "x-unillm-anthropic-key";
+    private static final String HEADER_GEMINI_KEY = "x-unillm-gemini-key";
+    private static final String HEADER_GROQ_KEY = "x-unillm-groq-key";
+    private static final String HEADER_INCLUDE_OLLAMA = "x-unillm-include-ollama";
+    private static final String HEADER_OLLAMA_URL = "x-unillm-ollama-base-url";
 
-    private final UniLLM llm;
     private final HttpServer server;
 
-    public UniLLMApiServer(int port, UniLLM llm) throws IOException {
-        this.llm = llm;
+    public UniLLMApiServer(int port) throws IOException {
         this.server = HttpServer.create(new InetSocketAddress(port), 0);
         this.server.createContext("/api/health", new HealthHandler());
         this.server.createContext("/api/providers", new ProvidersHandler());
@@ -48,8 +53,57 @@ public final class UniLLMApiServer {
 
     public static void main(String[] args) throws Exception {
         int port = parsePort(args);
-        UniLLM llm = createDefaultLlm();
-        new UniLLMApiServer(port, llm).start();
+        new UniLLMApiServer(port).start();
+    }
+
+    private static UniLLM createLlm(Map<String, String> config) {
+        String openAiKey = firstNonBlank(config.get(HEADER_OPENAI_KEY), System.getenv("OPENAI_API_KEY"));
+        String anthropicKey = firstNonBlank(config.get(HEADER_ANTHROPIC_KEY), System.getenv("ANTHROPIC_API_KEY"));
+        String geminiKey = firstNonBlank(config.get(HEADER_GEMINI_KEY), System.getenv("GEMINI_API_KEY"));
+        String groqKey = firstNonBlank(config.get(HEADER_GROQ_KEY), System.getenv("GROQ_API_KEY"));
+        boolean includeOllama = parseBoolean(firstNonBlank(config.get(HEADER_INCLUDE_OLLAMA), System.getenv("UNILLM_INCLUDE_OLLAMA")));
+        String ollamaBaseUrl = firstNonBlank(config.get(HEADER_OLLAMA_URL), System.getenv("UNILLM_OLLAMA_BASE_URL"), DEFAULT_OLLAMA_URL);
+
+        return UniLLM.fromFactory(new DefaultProviderClientFactory(
+                openAiKey,
+                anthropicKey,
+                geminiKey,
+                groqKey,
+                includeOllama,
+                ollamaBaseUrl
+        ));
+    }
+
+    private static boolean parseBoolean(String value) {
+        return value != null && Boolean.parseBoolean(value.trim());
+    }
+
+    private static String firstNonBlank(String... values) {
+        for (String value : values) {
+            if (value != null && !value.isBlank()) {
+                return value.trim();
+            }
+        }
+        return null;
+    }
+
+    private UniLLM resolveLlm(HttpExchange exchange) {
+        Map<String, String> config = new LinkedHashMap<>();
+        Headers headers = exchange.getRequestHeaders();
+        copyHeader(config, headers, HEADER_OPENAI_KEY);
+        copyHeader(config, headers, HEADER_ANTHROPIC_KEY);
+        copyHeader(config, headers, HEADER_GEMINI_KEY);
+        copyHeader(config, headers, HEADER_GROQ_KEY);
+        copyHeader(config, headers, HEADER_INCLUDE_OLLAMA);
+        copyHeader(config, headers, HEADER_OLLAMA_URL);
+        return createLlm(config);
+    }
+
+    private void copyHeader(Map<String, String> out, Headers headers, String name) {
+        List<String> values = headers.get(name);
+        if (values != null && !values.isEmpty()) {
+            out.put(name, values.get(0));
+        }
     }
 
     private static UniLLM createDefaultLlm() {
@@ -137,6 +191,7 @@ public final class UniLLMApiServer {
         @Override
         protected void handleRequest(HttpExchange exchange) throws IOException {
             requireMethod(exchange, "GET");
+            UniLLM llm = resolveLlm(exchange);
             ArrayNode providers = HttpJson.MAPPER.createArrayNode();
             for (String provider : llm.providers()) {
                 providers.add(provider);
@@ -151,6 +206,7 @@ public final class UniLLMApiServer {
         @Override
         protected void handleRequest(HttpExchange exchange) throws IOException, InterruptedException {
             requireMethod(exchange, "GET");
+            UniLLM llm = resolveLlm(exchange);
             Map<String, String> query = parseQuery(exchange.getRequestURI());
             String provider = query.get("provider");
 
@@ -183,6 +239,7 @@ public final class UniLLMApiServer {
         @Override
         protected void handleRequest(HttpExchange exchange) throws IOException, InterruptedException {
             requireMethod(exchange, "POST");
+            UniLLM llm = resolveLlm(exchange);
             JsonNode body = readJsonBody(exchange);
             if (body == null || body.isNull()) {
                 throw new IllegalArgumentException("Request body is required");
@@ -302,7 +359,7 @@ public final class UniLLMApiServer {
     private void addCorsHeaders(Headers headers) {
         headers.set("Access-Control-Allow-Origin", "*");
         headers.set("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
-        headers.set("Access-Control-Allow-Headers", "Content-Type");
+        headers.set("Access-Control-Allow-Headers", "Content-Type,x-unillm-openai-key,x-unillm-anthropic-key,x-unillm-gemini-key,x-unillm-groq-key,x-unillm-include-ollama,x-unillm-ollama-base-url");
         headers.set("Content-Type", "application/json; charset=utf-8");
     }
 
