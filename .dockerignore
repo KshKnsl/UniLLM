@@ -1,0 +1,10 @@
+/.git
+/.github
+/.vscode
+/frontend/node_modules
+/frontend/dist
+/out
+/target
+/Demo.class
+/.idea
+/node_modules

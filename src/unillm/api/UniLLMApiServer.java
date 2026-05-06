@@ -6,6 +6,9 @@ import java.io.InputStream;
 import java.net.InetSocketAddress;
 import java.net.URI;
 import java.net.URLDecoder;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -35,6 +38,7 @@ public final class UniLLMApiServer {
     private static final String HEADER_GROQ_KEY = "x-unillm-groq-key";
     private static final String HEADER_INCLUDE_OLLAMA = "x-unillm-include-ollama";
     private static final String HEADER_OLLAMA_URL = "x-unillm-ollama-base-url";
+    private static final Path WEB_ROOT = Paths.get("frontend", "dist");
 
     private final HttpServer server;
 
@@ -44,6 +48,7 @@ public final class UniLLMApiServer {
         this.server.createContext("/api/providers", new ProvidersHandler());
         this.server.createContext("/api/models", new ModelsHandler());
         this.server.createContext("/api/chat", new ChatHandler());
+        this.server.createContext("/", new StaticHandler());
     }
 
     public void start() {
@@ -135,7 +140,10 @@ public final class UniLLMApiServer {
     }
 
     private static int parsePort(String[] args) {
-        String explicit = System.getenv("UNILLM_PORT");
+        String explicit = System.getenv("PORT");
+        if (explicit == null || explicit.isBlank()) {
+            explicit = System.getenv("UNILLM_PORT");
+        }
         if (args != null && args.length > 0) {
             for (String arg : args) {
                 if (arg.startsWith("--port=")) {
@@ -270,6 +278,40 @@ public final class UniLLMApiServer {
         }
     }
 
+    private final class StaticHandler extends BaseHandler {
+        @Override
+        protected void handleRequest(HttpExchange exchange) throws IOException {
+            String method = exchange.getRequestMethod();
+            if (!"GET".equalsIgnoreCase(method) && !"HEAD".equalsIgnoreCase(method)) {
+                throw new IllegalArgumentException("Unsupported method: " + method);
+            }
+
+            Path indexFile = WEB_ROOT.resolve("index.html");
+            if (!Files.exists(indexFile)) {
+                sendPlainText(exchange, 404, "Frontend build not found");
+                return;
+            }
+
+            String requestPath = exchange.getRequestURI().getPath();
+            Path resolved = resolveStaticPath(requestPath);
+            if (resolved == null) {
+                sendPlainText(exchange, 404, "Not found");
+                return;
+            }
+
+            Path file = Files.exists(resolved) && !Files.isDirectory(resolved) ? resolved : indexFile;
+            byte[] bytes = Files.readAllBytes(file);
+            String contentType = Files.probeContentType(file);
+            if (contentType == null) {
+                contentType = file.getFileName().toString().endsWith(".html")
+                        ? "text/html; charset=utf-8"
+                        : "application/octet-stream";
+            }
+
+            sendBytes(exchange, 200, bytes, contentType);
+        }
+    }
+
     private void requireMethod(HttpExchange exchange, String method) {
         if (!method.equalsIgnoreCase(exchange.getRequestMethod())) {
             throw new IllegalArgumentException("Unsupported method: " + exchange.getRequestMethod());
@@ -361,6 +403,49 @@ public final class UniLLMApiServer {
         headers.set("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
         headers.set("Access-Control-Allow-Headers", "Content-Type,x-unillm-openai-key,x-unillm-anthropic-key,x-unillm-gemini-key,x-unillm-groq-key,x-unillm-include-ollama,x-unillm-ollama-base-url");
         headers.set("Content-Type", "application/json; charset=utf-8");
+    }
+
+    private Path resolveStaticPath(String requestPath) throws IOException {
+        if (requestPath == null || requestPath.isBlank() || "/".equals(requestPath)) {
+            return WEB_ROOT.resolve("index.html");
+        }
+
+        String normalizedPath = requestPath.startsWith("/") ? requestPath.substring(1) : requestPath;
+        Path resolved = WEB_ROOT.resolve(normalizedPath).normalize();
+        if (!resolved.startsWith(WEB_ROOT.normalize())) {
+            return null;
+        }
+
+        if (Files.exists(resolved) && !Files.isDirectory(resolved)) {
+            return resolved;
+        }
+
+        int lastSlash = normalizedPath.lastIndexOf('/');
+        int lastDot = normalizedPath.lastIndexOf('.');
+        if (lastDot > lastSlash) {
+            return null;
+        }
+
+        return WEB_ROOT.resolve("index.html");
+    }
+
+    private void sendBytes(HttpExchange exchange, int statusCode, byte[] bytes, String contentType) throws IOException {
+        exchange.getResponseHeaders().set("Content-Type", contentType);
+        exchange.sendResponseHeaders(statusCode, bytes.length);
+        if (!"HEAD".equalsIgnoreCase(exchange.getRequestMethod())) {
+            exchange.getResponseBody().write(bytes);
+            exchange.getResponseBody().flush();
+        }
+    }
+
+    private void sendPlainText(HttpExchange exchange, int statusCode, String message) throws IOException {
+        byte[] bytes = message.getBytes(StandardCharsets.UTF_8);
+        exchange.getResponseHeaders().set("Content-Type", "text/plain; charset=utf-8");
+        exchange.sendResponseHeaders(statusCode, bytes.length);
+        if (!"HEAD".equalsIgnoreCase(exchange.getRequestMethod())) {
+            exchange.getResponseBody().write(bytes);
+            exchange.getResponseBody().flush();
+        }
     }
 
     private void sendJson(HttpExchange exchange, int statusCode, JsonNode body) throws IOException {

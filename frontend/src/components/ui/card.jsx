@@ -1,4 +1,4 @@
-import { cn } from '../../lib/utils';
+import { cn } from '@/lib/utils';
 
 export function Card({ className, ...props }) {
   return <div className={cn('rounded-3xl border border-border/80 bg-card/90 text-card-foreground shadow-panel backdrop-blur-xl', className)} {...props} />;

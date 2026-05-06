@@ -1,0 +1,22 @@
+services:
+  - type: web
+    name: unillm-api
+    runtime: java
+    plan: free
+    buildCommand: |
+      javac -cp "lib/*" -d out src/unillm/*.java src/unillm/core/*.java src/unillm/providers/*.java src/unillm/api/*.java Demo.java
+    startCommand: java -cp "lib/*:out:." unillm.api.UniLLMApiServer --port=$PORT
+    envVars:
+      - key: PORT
+        value: "8080"
+      - key: OPENAI_API_KEY
+        scope: build,runtime
+      - key: ANTHROPIC_API_KEY
+        scope: build,runtime
+      - key: GEMINI_API_KEY
+        scope: build,runtime
+      - key: GROQ_API_KEY
+        scope: build,runtime
+      - key: UNILLM_INCLUDE_OLLAMA
+        value: "false"
+        scope: build,runtime
