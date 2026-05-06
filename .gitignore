@@ -4,3 +4,5 @@ out/
 target/
 *.class
 lib/
+frontend/node_modules/
+frontend/dist/

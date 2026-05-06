@@ -3,6 +3,8 @@
 Minimal Java package for calling multiple model providers with one interface.
 The library keeps orchestration in `UniLLM` and moves provider construction into a factory so the core stays open for extension.
 
+This repo now also includes a Java API server and a React frontend in `frontend/`.
+
 ## Supported Providers
 
 - OpenAI: models starting with `gpt`
@@ -15,11 +17,24 @@ The library keeps orchestration in `UniLLM` and moves provider construction into
 
 - Java 11+
 
-## Build JAR
+## Build And Run
 
-javac -cp "lib/*" -d out src/unillm/*.java src/unillm/core/*.java src/unillm/providers/*.java
-javac -cp "lib/*;out" Demo.java
-java -cp "lib/*;out;." Demo
+Java API:
+
+```bash
+javac -cp "lib/*" -d out src/unillm/*.java src/unillm/core/*.java src/unillm/providers/*.java src/unillm/api/*.java Demo.java
+java -cp "lib/*;out;." unillm.api.UniLLMApiServer
+```
+
+React frontend:
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+The Vite dev server proxies `/api` requests to `http://localhost:8080`.
 
 ## Quick Library Usage
 
