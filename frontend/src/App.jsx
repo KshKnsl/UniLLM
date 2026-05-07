@@ -457,7 +457,7 @@ function App() {
           </CardContent>
         </Card>
 
-        <Card className="border-border/60 bg-card/80">
+        {/* <Card className="border-border/60 bg-card/80">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-xl text-white">
               <ArrowRight className="h-5 w-5 text-emerald-300" />
@@ -505,9 +505,9 @@ function App() {
               </div>
             </form>
           </CardContent>
-        </Card>
+        </Card> */}
 
-        <Card className="border-border/60 bg-card/80">
+        {/* <Card className="border-border/60 bg-card/80">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-xl text-white">
               <AlertCircle className="h-5 w-5 text-cyan-300" />
@@ -520,7 +520,7 @@ function App() {
               {error ? <div className="text-red-300">Error: {error}</div> : responseText || 'The model response will appear here.'}
             </div>
           </CardContent>
-        </Card>
+        </Card> */}
 
         {/* ── Chat UI ── */}
         <ChatPanel
