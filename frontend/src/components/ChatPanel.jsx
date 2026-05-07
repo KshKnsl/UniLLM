@@ -118,7 +118,7 @@ export function ChatPanel({ appliedSettings, selectedModel, modelsByProvider }) 
       {/* Header */}
       <CardHeader className="shrink-0 pb-3">
         <div className="flex items-center justify-between">
-          <CardTitle className="flex items-center gap-2 text-xl text-white">
+          <CardTitle className="flex items-center gap-2 text-xl text-black">
             <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-emerald-500/20 text-emerald-300">
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
                 stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
