@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { ChatPanel } from './components/ChatPanel';
 import {
   AlertCircle,
   ArrowRight,
@@ -603,6 +604,13 @@ function App() {
             </div>
           </CardContent>
         </Card>
+
+        {/* ── Chat UI ── */}
+        <ChatPanel
+          appliedSettings={appliedSettings}
+          selectedModel={selectedModel}
+          modelsByProvider={modelsByProvider}
+        />
       </main>
     </div>
   );
