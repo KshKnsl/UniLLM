@@ -3,6 +3,8 @@ import { vi } from 'vitest';
 import App from './App';
 
 describe('App', () => {
+  const API_BASE_URL = 'https://unillm.onrender.com';
+
   beforeEach(() => {
     global.fetch = vi.fn((input) => {
       const url = typeof input === 'string' ? input : input.url;
@@ -24,13 +26,24 @@ describe('App', () => {
     });
   });
 
-  it('renders the main UI and shows API status', async () => {
+  it('renders the main UI and uses the fixed backend endpoint', async () => {
     render(<App />);
 
     expect(screen.getByText(/One console for the whole UniLLM library/i)).toBeInTheDocument();
-    expect(screen.getByLabelText(/Backend URL/i)).toHaveValue('http://localhost:8080');
+    expect(screen.getByText(/Backend endpoint/i)).toBeInTheDocument();
+    expect(screen.getByText(API_BASE_URL)).toBeInTheDocument();
 
-    await waitFor(() => expect(screen.getByText(/API online/i)).toBeInTheDocument());
+    await waitFor(() => {
+      expect(global.fetch).toHaveBeenCalledWith(
+        `${API_BASE_URL}/api/health`,
+        expect.objectContaining({
+          headers: expect.objectContaining({
+            'Content-Type': 'application/json'
+          })
+        })
+      );
+    });
+
     expect(screen.getByRole('heading', { name: /Providers/i })).toBeInTheDocument();
   });
 });

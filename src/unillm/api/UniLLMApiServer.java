@@ -6,10 +6,10 @@ import java.io.InputStream;
 import java.net.InetSocketAddress;
 import java.net.URI;
 import java.net.URLDecoder;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -230,14 +230,23 @@ public final class UniLLMApiServer {
                 return;
             }
 
-            Map<String, List<String>> allModels = llm.listAllModels();
             ObjectNode body = HttpJson.MAPPER.createObjectNode();
             ObjectNode providers = body.putObject("providers");
-            for (Map.Entry<String, List<String>> entry : allModels.entrySet()) {
-                ArrayNode models = providers.putArray(entry.getKey());
-                for (String model : entry.getValue()) {
-                    models.add(model);
+            ObjectNode providerErrors = body.putObject("providerErrors");
+
+            for (String providerName : llm.providers()) {
+                ArrayNode models = providers.putArray(providerName);
+                try {
+                    for (String model : llm.listModels(providerName)) {
+                        models.add(model);
+                    }
+                } catch (IOException ex) {
+                    providerErrors.put(providerName, ex.getMessage());
                 }
+            }
+
+            if (providerErrors.isEmpty()) {
+                body.remove("providerErrors");
             }
             sendJson(exchange, 200, body);
         }
