@@ -534,7 +534,7 @@ function App() {
           </CardContent>
         </Card>
 
-        <Card className="border-border/60 bg-card/80">
+        {/* <Card className="border-border/60 bg-card/80">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-xl text-slate-900">
               <ArrowRight className="h-5 w-5 text-emerald-300" />
@@ -582,9 +582,9 @@ function App() {
               </div>
             </form>
           </CardContent>
-        </Card>
+        </Card> */}
 
-        <Card className="border-border/60 bg-card/80">
+        {/* <Card className="border-border/60 bg-card/80">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-xl text-slate-900">
               <AlertCircle className="h-5 w-5 text-cyan-300" />
@@ -603,7 +603,7 @@ function App() {
               )}
             </div>
           </CardContent>
-        </Card>
+        </Card> */}
 
         {/* ── Chat UI ── */}
         <ChatPanel

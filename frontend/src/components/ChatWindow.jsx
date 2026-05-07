@@ -16,10 +16,10 @@ export function ChatWindow({ messages }) {
   if (messages.length === 0) {
     return (
       <div className="flex flex-1 flex-col items-center justify-center gap-3 text-center">
-        <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white/5 ring-1 ring-white/10">
-          <MessageSquare className="h-6 w-6 text-slate-400" />
+        <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-slate-200/60 ring-1 ring-slate-300/60">
+          <MessageSquare className="h-6 w-6 text-slate-600" />
         </div>
-        <p className="text-sm text-slate-400">
+        <p className="text-sm text-slate-600">
           No messages yet. Pick a model and start chatting.
         </p>
       </div>
