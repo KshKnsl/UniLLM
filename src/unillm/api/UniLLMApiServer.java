@@ -6,10 +6,10 @@ import java.io.InputStream;
 import java.net.InetSocketAddress;
 import java.net.URI;
 import java.net.URLDecoder;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -35,6 +35,7 @@ public final class UniLLMApiServer {
     private static final String HEADER_OPENAI_KEY = "x-unillm-openai-key";
     private static final String HEADER_ANTHROPIC_KEY = "x-unillm-anthropic-key";
     private static final String HEADER_GEMINI_KEY = "x-unillm-gemini-key";
+    private static final String HEADER_GEMINI_BASE_URL = "x-unillm-gemini-base-url";
     private static final String HEADER_GROQ_KEY = "x-unillm-groq-key";
     private static final String HEADER_INCLUDE_OLLAMA = "x-unillm-include-ollama";
     private static final String HEADER_OLLAMA_URL = "x-unillm-ollama-base-url";
@@ -65,6 +66,7 @@ public final class UniLLMApiServer {
         String openAiKey = firstNonBlank(config.get(HEADER_OPENAI_KEY), System.getenv("OPENAI_API_KEY"));
         String anthropicKey = firstNonBlank(config.get(HEADER_ANTHROPIC_KEY), System.getenv("ANTHROPIC_API_KEY"));
         String geminiKey = firstNonBlank(config.get(HEADER_GEMINI_KEY), System.getenv("GEMINI_API_KEY"));
+        String geminiBaseUrl = firstNonBlank(config.get(HEADER_GEMINI_BASE_URL), System.getenv("UNILLM_GEMINI_BASE_URL"), unillm.providers.GeminiClient.DEFAULT_BASE_URL);
         String groqKey = firstNonBlank(config.get(HEADER_GROQ_KEY), System.getenv("GROQ_API_KEY"));
         boolean includeOllama = parseBoolean(firstNonBlank(config.get(HEADER_INCLUDE_OLLAMA), System.getenv("UNILLM_INCLUDE_OLLAMA")));
         String ollamaBaseUrl = firstNonBlank(config.get(HEADER_OLLAMA_URL), System.getenv("UNILLM_OLLAMA_BASE_URL"), DEFAULT_OLLAMA_URL);
@@ -75,7 +77,8 @@ public final class UniLLMApiServer {
                 geminiKey,
                 groqKey,
                 includeOllama,
-                ollamaBaseUrl
+                ollamaBaseUrl,
+                geminiBaseUrl
         ));
     }
 
@@ -98,6 +101,7 @@ public final class UniLLMApiServer {
         copyHeader(config, headers, HEADER_OPENAI_KEY);
         copyHeader(config, headers, HEADER_ANTHROPIC_KEY);
         copyHeader(config, headers, HEADER_GEMINI_KEY);
+        copyHeader(config, headers, HEADER_GEMINI_BASE_URL);
         copyHeader(config, headers, HEADER_GROQ_KEY);
         copyHeader(config, headers, HEADER_INCLUDE_OLLAMA);
         copyHeader(config, headers, HEADER_OLLAMA_URL);
@@ -115,27 +119,17 @@ public final class UniLLMApiServer {
         Map<String, String> env = System.getenv();
         boolean includeOllama = Boolean.parseBoolean(env.getOrDefault("UNILLM_INCLUDE_OLLAMA", "false"));
         String ollamaBaseUrl = env.getOrDefault("UNILLM_OLLAMA_BASE_URL", DEFAULT_OLLAMA_URL);
+        String geminiBaseUrl = env.getOrDefault("UNILLM_GEMINI_BASE_URL", unillm.providers.GeminiClient.DEFAULT_BASE_URL);
 
         DefaultProviderClientFactory factory = new DefaultProviderClientFactory(
                 env.get("OPENAI_API_KEY"),
                 env.get("ANTHROPIC_API_KEY"),
                 env.get("GEMINI_API_KEY"),
                 env.get("GROQ_API_KEY"),
-                includeOllama
+                includeOllama,
+                ollamaBaseUrl,
+                geminiBaseUrl
         );
-
-        if (includeOllama && !DEFAULT_OLLAMA_URL.equals(ollamaBaseUrl)) {
-            List<unillm.ProviderClient> clients = new ArrayList<>();
-            for (unillm.ProviderClient client : factory.createClients()) {
-                if ("ollama".equals(client.name())) {
-                    clients.add(new unillm.providers.OllamaClient(ollamaBaseUrl));
-                } else {
-                    clients.add(client);
-                }
-            }
-            return new UniLLM(clients);
-        }
-
         return UniLLM.fromFactory(factory);
     }
 
@@ -230,14 +224,23 @@ public final class UniLLMApiServer {
                 return;
             }
 
-            Map<String, List<String>> allModels = llm.listAllModels();
             ObjectNode body = HttpJson.MAPPER.createObjectNode();
             ObjectNode providers = body.putObject("providers");
-            for (Map.Entry<String, List<String>> entry : allModels.entrySet()) {
-                ArrayNode models = providers.putArray(entry.getKey());
-                for (String model : entry.getValue()) {
-                    models.add(model);
+            ObjectNode providerErrors = body.putObject("providerErrors");
+
+            for (String providerName : llm.providers()) {
+                ArrayNode models = providers.putArray(providerName);
+                try {
+                    for (String model : llm.listModels(providerName)) {
+                        models.add(model);
+                    }
+                } catch (IOException ex) {
+                    providerErrors.put(providerName, ex.getMessage());
                 }
+            }
+
+            if (providerErrors.isEmpty()) {
+                body.remove("providerErrors");
             }
             sendJson(exchange, 200, body);
         }
@@ -401,7 +404,7 @@ public final class UniLLMApiServer {
     private void addCorsHeaders(Headers headers) {
         headers.set("Access-Control-Allow-Origin", "*");
         headers.set("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
-        headers.set("Access-Control-Allow-Headers", "Content-Type,x-unillm-openai-key,x-unillm-anthropic-key,x-unillm-gemini-key,x-unillm-groq-key,x-unillm-include-ollama,x-unillm-ollama-base-url");
+        headers.set("Access-Control-Allow-Headers", "Content-Type,x-unillm-openai-key,x-unillm-anthropic-key,x-unillm-gemini-key,x-unillm-gemini-base-url,x-unillm-groq-key,x-unillm-include-ollama,x-unillm-ollama-base-url");
         headers.set("Content-Type", "application/json; charset=utf-8");
     }
 

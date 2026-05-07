@@ -26,7 +26,7 @@ public final class HttpJson {
         HttpResponse<String> response = client.send(builder.build(), HttpResponse.BodyHandlers.ofString());
 
         if (response.statusCode() < 200 || response.statusCode() >= 300) {
-            throw new IOException("HTTP " + response.statusCode() + " from " + url + ": " + response.body());
+            throw new IOException("HTTP " + response.statusCode() + " from " + sanitizeUrl(url) + ": " + response.body());
         }
         return MAPPER.readTree(response.body());
     }
@@ -40,8 +40,18 @@ public final class HttpJson {
         HttpResponse<String> response = client.send(builder.build(), HttpResponse.BodyHandlers.ofString());
 
         if (response.statusCode() < 200 || response.statusCode() >= 300) {
-            throw new IOException("HTTP " + response.statusCode() + " from " + url + ": " + response.body());
+            throw new IOException("HTTP " + response.statusCode() + " from " + sanitizeUrl(url) + ": " + response.body());
         }
         return MAPPER.readTree(response.body());
+    }
+
+    private static String sanitizeUrl(String url) {
+        if (url == null || url.isBlank()) {
+            return "";
+        }
+
+        return url
+                .replaceAll("([?&](?:key|api_key|token)=)[^&]*", "$1***")
+                .replaceAll("([?&](?:access_token)=)[^&]*", "$1***");
     }
 }
