@@ -15,11 +15,19 @@ import java.util.List;
 import java.util.Map;
 
 public class GeminiClient implements ProviderClient {
+    public static final String DEFAULT_BASE_URL = "https://jiitproxy.jportal696.workers.dev/api";
+
     private final String apiKey;
+    private final String baseUrl;
     private final HttpClient http = HttpClient.newHttpClient();
 
     public GeminiClient(String apiKey) {
+        this(apiKey, DEFAULT_BASE_URL);
+    }
+
+    public GeminiClient(String apiKey, String baseUrl) {
         this.apiKey = apiKey;
+        this.baseUrl = normalizeBaseUrl(baseUrl);
     }
 
     @Override
@@ -66,7 +74,7 @@ public class GeminiClient implements ProviderClient {
             }
         }
 
-        String url = "https://generativelanguage.googleapis.com/v1beta/models/" + normalizeModel(request.model())
+        String url = baseUrl + "/v1beta/models/" + normalizeModel(request.model())
                 + ":generateContent?key=" + apiKey;
         JsonNode res = HttpJson.postJson(http, url, Map.of(), body);
         String text = res.path("candidates").path(0).path("content").path("parts").path(0).path("text").asText("");
@@ -75,7 +83,7 @@ public class GeminiClient implements ProviderClient {
 
     @Override
     public List<String> listModels() throws IOException, InterruptedException {
-        String url = "https://generativelanguage.googleapis.com/v1beta/models?key=" + apiKey;
+        String url = baseUrl + "/v1beta/models?key=" + apiKey;
         JsonNode res = HttpJson.getJson(http, url, Map.of());
         List<String> names = new java.util.ArrayList<>();
         for (JsonNode item : res.path("models")) {
@@ -89,5 +97,13 @@ public class GeminiClient implements ProviderClient {
 
     private String normalizeModel(String model) {
         return model.startsWith("models/") ? model.substring("models/".length()) : model;
+    }
+
+    private String normalizeBaseUrl(String value) {
+        if (value == null || value.isBlank()) {
+            return DEFAULT_BASE_URL;
+        }
+        String trimmed = value.trim();
+        return trimmed.endsWith("/") ? trimmed.substring(0, trimmed.length() - 1) : trimmed;
     }
 }
