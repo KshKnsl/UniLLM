@@ -20,3 +20,4 @@ services:
       - key: UNILLM_INCLUDE_OLLAMA
         value: "false"
         scope: build,runtime
+   
